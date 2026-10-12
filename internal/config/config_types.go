@@ -518,6 +518,8 @@ type CloakConfig struct {
 // ClaudeKey represents the configuration for a Claude API key,
 // including the API key itself and an optional base URL for the API endpoint.
 type ClaudeKey struct {
+	// QuotaProbe configures a management-only account usage query.
+	QuotaProbe map[string]any `yaml:"quota-probe,omitempty" json:"quota-probe,omitempty"`
 	// APIKey is the authentication key for accessing Claude API services.
 	APIKey string `yaml:"api-key" json:"api-key"`
 
@@ -638,6 +640,8 @@ func (m ClaudeModel) GetThinking() *registry.ThinkingSupport { return m.Thinking
 // CodexKey represents the configuration for a Codex API key,
 // including the API key itself and an optional base URL for the API endpoint.
 type CodexKey struct {
+	// QuotaProbe configures a management-only account usage query.
+	QuotaProbe map[string]any `yaml:"quota-probe,omitempty" json:"quota-probe,omitempty"`
 	// APIKey is the authentication key for accessing Codex API services.
 	APIKey string `yaml:"api-key" json:"api-key"`
 
@@ -756,6 +760,8 @@ type MetaModel = CodexModel
 // GeminiKey represents the configuration for a Gemini API key,
 // including optional overrides for upstream base URL, proxy routing, and headers.
 type GeminiKey struct {
+	// QuotaProbe configures a management-only account usage query.
+	QuotaProbe map[string]any `yaml:"quota-probe,omitempty" json:"quota-probe,omitempty"`
 	// APIKey is the authentication key for accessing Gemini API services.
 	APIKey string `yaml:"api-key" json:"api-key"`
 
@@ -844,6 +850,8 @@ func (m GeminiModel) GetThinking() *registry.ThinkingSupport { return m.Thinking
 // OpenAICompatibility represents the configuration for OpenAI API compatibility
 // with external providers, allowing model aliases to be routed through OpenAI API format.
 type OpenAICompatibility struct {
+	// QuotaProbe provides the default account query for this provider's keys.
+	QuotaProbe map[string]any `yaml:"quota-probe,omitempty" json:"quota-probe,omitempty"`
 	// Name is the identifier for this OpenAI compatibility configuration.
 	Name string `yaml:"name" json:"name"`
 
@@ -886,6 +894,8 @@ type OpenAICompatibility struct {
 
 // OpenAICompatibilityAPIKey represents an API key configuration with optional proxy setting.
 type OpenAICompatibilityAPIKey struct {
+	// QuotaProbe overrides the provider's account query for this key.
+	QuotaProbe map[string]any `yaml:"quota-probe,omitempty" json:"quota-probe,omitempty"`
 	// APIKey is the authentication key for accessing the external API services.
 	APIKey string `yaml:"api-key" json:"api-key"`
 

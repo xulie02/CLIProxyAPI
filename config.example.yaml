@@ -458,6 +458,19 @@ upstream:
 
 # BEGIN API KEY EXAMPLES
 
+# Account queries are optional for every API-key family, at group or key level.
+# The management UI uses quota-probe with the existing authenticated API-call endpoint.
+# Example (replace the URL and paths with the supplier documentation):
+#   quota-probe:
+#     url: https://supplier.example/account/balance
+#     method: GET
+#     header: {Authorization: "Bearer $TOKEN$"}
+#     mapping:
+#       summary:
+#         - {key: balance, label: Balance, value: data.balance, currency: USD}
+#         - {key: points_used, label: Points used, value: data.points_used, unit: points}
+# Missing metrics stay unknown. Amounts are never inferred from model token counts.
+#
 # api-keys:
 #
 #   # Gemini API keys
