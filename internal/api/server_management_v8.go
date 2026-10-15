@@ -52,6 +52,7 @@ func (s *Server) registerManagementV8Routes() {
 	v8.GET("/oauth/auth-url", s.mgmt.StartOAuthV8)
 	v8.GET("/oauth/status", s.mgmt.GetAuthStatus)
 	v8.DELETE("/oauth/session", s.mgmt.CancelAuthSession)
+	v8.GET("/oauth/open-design/quota", s.mgmt.OpenDesignQuota)
 
 	v8.GET("/plugins", s.mgmt.ListPlugins)
 	v8.DELETE("/plugins/:id", s.mgmt.DeletePlugin)

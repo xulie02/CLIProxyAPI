@@ -1331,7 +1331,7 @@ func modelRegistrationAvailability(registration *ModelRegistration, now time.Tim
 	quotaAndOtherSuspended := 0
 	if registration.SuspendedClients != nil {
 		for clientID, reason := range registration.SuspendedClients {
-			if strings.EqualFold(reason, "quota") {
+			if strings.EqualFold(reason, "quota") || strings.EqualFold(reason, "cooldown") {
 				cooldownSuspended++
 				continue
 			}
@@ -1528,7 +1528,7 @@ func (r *ModelRegistry) GetAvailableModelsByProvider(provider string) []*ModelIn
 					if p, okProvider := r.clientProviders[clientID]; !okProvider || p != provider {
 						continue
 					}
-					if strings.EqualFold(reason, "quota") {
+					if strings.EqualFold(reason, "quota") || strings.EqualFold(reason, "cooldown") {
 						cooldownSuspended++
 						continue
 					}

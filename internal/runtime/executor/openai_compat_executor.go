@@ -1135,7 +1135,7 @@ func newOpenAICompatStatusError(status int, headers http.Header, body []byte) st
 // token limits; in that narrow case a one-minute fallback prevents immediate
 // replay of the same large request while keeping the retry wait bounded.
 func openAICompatRetryAfter(status int, headers http.Header, body []byte, now time.Time) *time.Duration {
-	if status != http.StatusTooManyRequests {
+	if status != http.StatusTooManyRequests && status != http.StatusRequestTimeout && (status < 500 || status > 599) {
 		return nil
 	}
 	if raw := strings.TrimSpace(headers.Get("Retry-After")); raw != "" {
@@ -1150,6 +1150,9 @@ func openAICompatRetryAfter(status int, headers http.Header, body []byte, now ti
 			}
 			return &delay
 		}
+	}
+	if status != http.StatusTooManyRequests {
+		return nil
 	}
 
 	code := strings.ToLower(strings.TrimSpace(gjson.GetBytes(body, "error.code").String()))

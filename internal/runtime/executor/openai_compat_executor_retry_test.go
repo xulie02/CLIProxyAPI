@@ -59,9 +59,26 @@ func TestOpenAICompatRetryAfter(t *testing.T) {
 			body:   `{"error":{"code":"rate_limit"}}`,
 		},
 		{
-			name:    "non-429 ignores header",
+			name:    "503 preserves provider recovery deadline",
 			status:  http.StatusServiceUnavailable,
 			headers: http.Header{"Retry-After": {"30"}},
+			want:    durationPointer(30 * time.Second),
+		},
+		{
+			name:    "Cloudflare 520 preserves provider recovery deadline",
+			status:  520,
+			headers: http.Header{"Retry-After": {"60"}},
+			want:    durationPointer(time.Minute),
+		},
+		{
+			name:    "permanent request error ignores header",
+			status:  http.StatusBadRequest,
+			headers: http.Header{"Retry-After": {"30"}},
+		},
+		{
+			name:   "503 does not invent a TPM fallback",
+			status: http.StatusServiceUnavailable,
+			body:   `{"error":{"code":"ModelAccountTpmRateLimitExceeded"}}`,
 		},
 	}
 

@@ -242,7 +242,7 @@ func (m *Manager) clientModelProjectionForAuth(auth *Auth, routeModel string, no
 	isQuotaExceeded := false
 	var suspendReason string
 	if state != nil {
-		if state.Status == StatusDisabled || state.Unavailable || (!state.NextRetryAfter.IsZero() && state.NextRetryAfter.After(now)) {
+		if state.Status == StatusDisabled || (state.Unavailable && state.NextRetryAfter.IsZero()) || state.NextRetryAfter.After(now) {
 			isSuspended = true
 		}
 		if state.Quota.Exceeded && (state.Quota.NextRecoverAt.IsZero() || state.Quota.NextRecoverAt.After(now)) {
@@ -262,12 +262,34 @@ func (m *Manager) clientModelProjectionForAuth(auth *Auth, routeModel string, no
 	if isSuspended && suspendReason == "" {
 		suspendReason = cooldownReason(auth.StatusMessage, auth.Quota, auth.LastError)
 	}
+	// A transient routing cooldown must not remove a configured model from the
+	// public catalog. Clients need to keep its identity while waiting to retry.
+	if isSuspended && !auth.Disabled && auth.Status != StatusDisabled && !auth.Quota.Exceeded {
+		if state != nil && state.Status != StatusDisabled && !state.Quota.Exceeded &&
+			isTransientCatalogCooldown(state.LastError, state.NextRetryAfter, now) {
+			suspendReason = "cooldown"
+		} else if len(auth.ModelStates) == 0 && isTransientCatalogCooldown(auth.LastError, auth.NextRetryAfter, now) {
+			suspendReason = "cooldown"
+		}
+	}
 
 	return registry.ClientModelProjection{
 		ModelID:       targetModel,
 		Suspended:     isSuspended,
 		SuspendReason: suspendReason,
 		QuotaExceeded: isQuotaExceeded,
+	}
+}
+
+func isTransientCatalogCooldown(lastErr *Error, retryAfter, now time.Time) bool {
+	if lastErr == nil || !retryAfter.After(now) {
+		return false
+	}
+	switch lastErr.HTTPStatus {
+	case 408, 500, 502, 503, 504, 520, 521, 522, 523, 524, 525, 526:
+		return true
+	default:
+		return false
 	}
 }
 
