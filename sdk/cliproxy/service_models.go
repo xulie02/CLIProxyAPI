@@ -28,6 +28,7 @@ func (s *Service) registerModelsForAuthWithCache(ctx context.Context, a *coreaut
 	if ctx.Err() != nil {
 		return
 	}
+	s.requestUpstreamDiscovery()
 	s.cancelStaleAntigravityProbes(a.ID)
 	if a.Disabled {
 		if s != nil && s.coreManager != nil {
@@ -238,6 +239,7 @@ func (s *Service) registerModelsForAuthWithCache(ctx context.Context, a *coreaut
 				}
 				isCompatAuth = true
 				ms := buildOpenAICompatibilityConfigModels(compat)
+				ms = discoveredCompatibilityModels(ms, compat, a)
 				if providerKey == "" {
 					providerKey = "openai-compatibility"
 				}
@@ -262,7 +264,7 @@ func (s *Service) registerModelsForAuthWithCache(ctx context.Context, a *coreaut
 				if providerKey == "" {
 					providerKey = "openai-compatibility"
 				}
-				ms := cached.models
+				ms := discoveredCompatibilityModels(cached.models, cached.compat, a)
 				if len(ms) > 0 {
 					ms = s.appendPluginModels(providerKey, ms)
 					s.registerResolvedModelsForAuth(a, providerKey, applyModelPrefixes(ms, a.Prefix, s.cfg.ForceModelPrefix))
@@ -803,8 +805,14 @@ func buildOpenAICompatibilityConfigModels(compat *config.OpenAICompatibility) []
 			continue
 		}
 		thinkingSupport := model.Thinking
-		if thinkingSupport == nil && !model.Image {
-			thinkingSupport = modelconfig.ResolveModelInfo(info.MetadataModelID, modelType, nil).Thinking
+		if !model.Image {
+			fallback := modelconfig.ResolveModelInfo(info.MetadataModelID, modelType, nil)
+			if thinkingSupport == nil {
+				thinkingSupport = fallback.Thinking
+			}
+			if info.MaxContextLength <= 0 {
+				info.ContextLength = fallback.ContextLength
+			}
 		}
 		if model.Thinking != nil {
 			info.ExplicitThinking = true

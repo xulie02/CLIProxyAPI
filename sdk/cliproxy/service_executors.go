@@ -31,6 +31,7 @@ var pluginHostHasAuthModelProvider = func(host *pluginhost.Host, provider string
 type openAICompatibilityRegistrationEntry struct {
 	providerKey string
 	models      []*ModelInfo
+	compat      *config.OpenAICompatibility
 }
 
 func (s *Service) newOpenAICompatibilityRegistrationCache() *openAICompatibilityRegistrationCache {
@@ -60,6 +61,7 @@ func (s *Service) newOpenAICompatibilityRegistrationCache() *openAICompatibility
 			providerName = "openai-compatibility"
 		}
 		entry := &openAICompatibilityRegistrationEntry{
+			compat:      compat,
 			providerKey: util.OpenAICompatibleProviderKey(providerName),
 			models:      buildOpenAICompatibilityConfigModels(compat),
 		}

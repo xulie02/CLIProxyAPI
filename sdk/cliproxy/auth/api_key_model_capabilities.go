@@ -411,7 +411,9 @@ func compileAPIKeyModelCapabilitiesForAuth(cfg *internalconfig.Config, auth *Aut
 			compatName = strings.TrimSpace(auth.Attributes["compat_name"])
 		}
 		if entry := resolveOpenAICompatConfigForAuth(cfg, auth, providerKey, compatName); entry != nil {
-			compileOpenAICompatibleModelCapabilities(out, entry.Models)
+			compileOpenAICompatibleModelCapabilities(out, entry.Models, modelconfig.UpstreamSource{
+				BaseURL: entry.BaseURL, APIKey: auth.Attributes["api_key"], Headers: entry.Headers,
+			})
 		}
 	}
 	if len(out) == 0 {
@@ -434,9 +436,14 @@ func compileConfiguredModelCapabilities[T interface {
 	}
 }
 
-func compileOpenAICompatibleModelCapabilities(out map[string][]apiKeyModelCapabilityRoute, models []internalconfig.OpenAICompatibilityModel) {
+func compileOpenAICompatibleModelCapabilities(out map[string][]apiKeyModelCapabilityRoute, models []internalconfig.OpenAICompatibilityModel, sources ...modelconfig.UpstreamSource) {
 	for i := range models {
-		addConfiguredModelCapability(out, models[i].Name, models[i].Alias, "openai-compatibility", models[i].Thinking, models[i].IsCompat)
+		info := addConfiguredModelCapability(out, models[i].Name, models[i].Alias, "openai-compatibility", models[i].Thinking, models[i].IsCompat)
+		if info != nil && !models[i].Image && len(sources) > 0 {
+			info.ExplicitThinking = models[i].Thinking != nil
+			info.MaxContextLength = models[i].MaxContextLength
+			modelconfig.ApplyUpstreamCapabilities(info, sources[0], info.ID)
+		}
 	}
 }
 

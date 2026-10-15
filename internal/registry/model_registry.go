@@ -142,6 +142,8 @@ type availableModelsCacheEntry struct {
 // ThinkingSupport describes a model family's supported internal reasoning budget range.
 // Values are interpreted in provider-native token units.
 type ThinkingSupport struct {
+	// DefaultLevel is advertised by the upstream or explicitly configured.
+	DefaultLevel string `json:"default_level,omitempty" yaml:"default-level,omitempty"`
 	// Min is the minimum allowed thinking budget (inclusive).
 	Min int `json:"min,omitempty" yaml:"min,omitempty"`
 	// Max is the maximum allowed thinking budget (inclusive).

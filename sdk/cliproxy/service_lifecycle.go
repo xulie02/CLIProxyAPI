@@ -392,6 +392,7 @@ func (s *Service) ensureAuthDir() error {
 
 // startModelCatalogUpdaters applies the same catalog policy for SDK and CLI users.
 func (s *Service) startModelCatalogUpdaters(ctx context.Context) {
+	s.startUpstreamDiscovery(ctx)
 	s.cfgMu.RLock()
 	cfg := s.cfg
 	s.cfgMu.RUnlock()

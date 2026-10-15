@@ -23,7 +23,7 @@ func TestOpenAICompatibilityThinkingUsesUpstreamCapabilities(t *testing.T) {
 		model config.OpenAICompatibilityModel
 		want  *internalregistry.ThinkingSupport
 	}{
-		{"known upstream behind alias", config.OpenAICompatibilityModel{Name: "claude-opus-4-6(high)", Alias: "private-chat"}, known.Thinking},
+		{"known name without advertised capabilities", config.OpenAICompatibilityModel{Name: "claude-opus-4-6(high)", Alias: "private-chat"}, known.Thinking},
 		{"unknown upstream behind known alias", config.OpenAICompatibilityModel{Name: "unknown-upstream", Alias: "claude-opus-4-6"}, nil},
 		{"explicit override", config.OpenAICompatibilityModel{Name: "claude-opus-4-6", Thinking: &internalregistry.ThinkingSupport{Levels: []string{"ultra", "max"}}}, &internalregistry.ThinkingSupport{Levels: []string{"ultra", "max"}}},
 		{"explicit empty", config.OpenAICompatibilityModel{Name: "claude-opus-4-6", Thinking: &internalregistry.ThinkingSupport{}}, &internalregistry.ThinkingSupport{}},

@@ -51,5 +51,9 @@ func NormalizeThinkingSupport(raw *registry.ThinkingSupport) *registry.ThinkingS
 		seen[level] = struct{}{}
 		normalized.Levels = append(normalized.Levels, level)
 	}
+	normalized.DefaultLevel = strings.ToLower(strings.TrimSpace(raw.DefaultLevel))
+	if _, ok := seen[normalized.DefaultLevel]; !ok {
+		normalized.DefaultLevel = ""
+	}
 	return &normalized
 }

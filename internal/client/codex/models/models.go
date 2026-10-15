@@ -152,6 +152,7 @@ func buildCodexClientModelsWithToolCapabilities(models []map[string]any, provide
 
 		entry := cloneCodexClientModelMap(defaultTemplate)
 		applyCodexClientModelMetadata(entry, id, model, optimizeMultiAgentV2, clientVersion)
+		applyCodexClientMaxContextLengthOverride(entry, model)
 		applyCodexClientMaxTokens(entry, model)
 		applyCodexClientSearchToolSupport(entry, id, false, searchToolProvidersForModel, toolSearchCapabilityForModel)
 		applyCPAWebSearchCapability(entry, id, webSearchCapabilityForModel, clientVersion)
@@ -503,7 +504,17 @@ func intersectThinkingSupport(a, b *registry.ThinkingSupport) *registry.Thinking
 	if b.Max > 0 && (max == 0 || b.Max < max) {
 		max = b.Max
 	}
+	defaultLevel := ""
+	if a.DefaultLevel == b.DefaultLevel {
+		for _, level := range levels {
+			if level == a.DefaultLevel {
+				defaultLevel = level
+				break
+			}
+		}
+	}
 	return &registry.ThinkingSupport{
+		DefaultLevel:   defaultLevel,
 		Min:            min,
 		Max:            max,
 		ZeroAllowed:    a.ZeroAllowed && b.ZeroAllowed,
@@ -535,6 +546,18 @@ func intersectStringSlices(a, b []string) []string {
 }
 
 func applyCodexClientMaxContextLengthOverride(entry map[string]any, model map[string]any) {
+	if info := registry.LookupModelInfo(stringModelValue(model, "id")); info != nil && info.Type == "openai-compatibility" {
+		window := info.ContextLength
+		if info.MaxContextLength > 0 {
+			window = info.MaxContextLength
+		}
+		delete(entry, "context_window")
+		delete(entry, "max_context_window")
+		if window > 0 {
+			entry["context_window"] = window
+			entry["max_context_window"] = window
+		}
+	}
 	if maxContextLength := intModelValue(model, "max_context_length"); maxContextLength > 0 {
 		entry["context_window"] = maxContextLength
 		entry["max_context_window"] = maxContextLength
@@ -836,6 +859,14 @@ func applyCodexClientThinkingMetadata(entry map[string]any, thinking *registry.T
 	}
 	if defaultLevel == "" {
 		defaultLevel = firstLevel
+	}
+	if advertised := normalizeCodexClientReasoningLevel(thinking.DefaultLevel, clientVersion); advertised != "" {
+		for _, raw := range levels {
+			if raw.(map[string]any)["effort"] == advertised {
+				defaultLevel = advertised
+				break
+			}
+		}
 	}
 
 	entry["supported_reasoning_levels"] = levels

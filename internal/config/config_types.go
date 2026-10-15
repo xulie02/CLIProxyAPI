@@ -944,7 +944,7 @@ type OpenAICompatibilityModel struct {
 	UseMaxCompletionTokens bool `yaml:"use-max-completion-tokens,omitempty" json:"use-max-completion-tokens,omitempty"`
 
 	// Thinking configures the thinking/reasoning capability for this model.
-	// If nil, capabilities are inherited from the known upstream model; unknown models remain unspecified.
+	// If nil, use upstream model metadata, then the internal model catalog; unresolved capabilities stay unspecified.
 	Thinking *registry.ThinkingSupport `yaml:"thinking,omitempty" json:"thinking,omitempty"`
 }
 

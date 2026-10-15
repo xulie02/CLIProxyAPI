@@ -3,16 +3,50 @@ package auth
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"reflect"
 	"strconv"
 	"testing"
 
 	internalconfig "github.com/router-for-me/CLIProxyAPI/v8/internal/config"
+	"github.com/router-for-me/CLIProxyAPI/v8/internal/modelconfig"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
 	"github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executionregistry"
 	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
 )
+
+func TestConfiguredCompatExecutionUsesDiscoveredCapability(t *testing.T) {
+	original := modelconfig.DefaultUpstreamCatalog
+	modelconfig.DefaultUpstreamCatalog = modelconfig.NewUpstreamCatalog()
+	t.Cleanup(func() { modelconfig.DefaultUpstreamCatalog = original })
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, `{"data":[{"id":"actual-upstream","effort":{"supported_levels":["low","high","max"],"default_level":"high"}}]}`)
+	}))
+	defer server.Close()
+	manager := NewManager(nil, nil, nil)
+	cfg := &internalconfig.Config{OpenAICompatibility: []internalconfig.OpenAICompatibility{{
+		Name: "discovered-channel", BaseURL: server.URL, APIKeyEntries: []internalconfig.OpenAICompatibilityAPIKey{{APIKey: "test-key"}},
+		Models: []internalconfig.OpenAICompatibilityModel{{Name: "actual-upstream", Alias: "public-model"}},
+	}}}
+	manager.SetConfig(cfg)
+	auth := &Auth{ID: "discovered-auth", Provider: "discovered-channel", Attributes: map[string]string{
+		AttributeAuthKind: AuthKindAPIKey, AttributeAPIKey: "test-key", "compat_name": "discovered-channel", "provider_key": "discovered-channel", "base_url": server.URL,
+	}}
+	registerCapabilityTestAuth(t, manager, auth)
+	source := modelconfig.UpstreamSource{BaseURL: server.URL, APIKey: "test-key"}
+	if _, err := modelconfig.DefaultUpstreamCatalog.Refresh(t.Context(), server.Client(), source); err != nil {
+		t.Fatal(err)
+	}
+	manager.RefreshAPIKeyModelAlias()
+	req := manager.attachResolvedAPIKeyModelInfo(cliproxyexecutor.Request{}, auth, "public-model", "actual-upstream")
+	assertResolvedThinkingLevels(t, req, "low", "high", "max")
+	info, _ := ResolvedAPIKeyModelInfo(req)
+	if info.Thinking.DefaultLevel != "high" {
+		t.Fatal("upstream default lost during routing")
+	}
+}
 
 func TestCompileOpenAICompatibleThinkingUsesUpstreamCapabilities(t *testing.T) {
 	known := registry.LookupStaticModelInfo("claude-opus-4-6")

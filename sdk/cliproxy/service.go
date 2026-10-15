@@ -30,7 +30,8 @@ type Service struct {
 	cfg *config.Config
 
 	// cfgMu protects concurrent access to the configuration.
-	cfgMu sync.RWMutex
+	cfgMu                 sync.RWMutex
+	upstreamDiscoveryWake chan struct{}
 
 	// configUpdateMu serializes config updates across watcher + home.
 	configUpdateMu sync.Mutex
