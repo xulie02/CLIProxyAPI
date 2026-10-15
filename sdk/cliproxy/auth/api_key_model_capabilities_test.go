@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"reflect"
 	"strconv"
 	"testing"
 
@@ -12,6 +13,35 @@ import (
 	"github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executionregistry"
 	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
 )
+
+func TestCompileOpenAICompatibleThinkingUsesUpstreamCapabilities(t *testing.T) {
+	known := registry.LookupStaticModelInfo("claude-opus-4-6")
+	if known == nil || known.Thinking == nil {
+		t.Fatal("known model missing thinking capabilities")
+	}
+	models := []internalconfig.OpenAICompatibilityModel{
+		{Name: "claude-opus-4-6(high)", Alias: "known-alias"},
+		{Name: "unknown-upstream", Alias: "claude-opus-4-6"},
+		{Name: "claude-opus-4-6", Alias: "explicit-alias", Thinking: &registry.ThinkingSupport{Levels: []string{"ultra", "max"}}},
+		{Name: "claude-opus-4-6", Alias: "empty-alias", Thinking: &registry.ThinkingSupport{}},
+	}
+	for index, tc := range []struct {
+		alias string
+		want  *registry.ThinkingSupport
+	}{
+		{"known-alias", known.Thinking},
+		{"claude-opus-4-6", nil},
+		{"explicit-alias", &registry.ThinkingSupport{Levels: []string{"ultra", "max"}}},
+		{"empty-alias", &registry.ThinkingSupport{}},
+	} {
+		table := make(map[string][]apiKeyModelCapabilityRoute)
+		compileOpenAICompatibleModelCapabilities(table, models[index:index+1])
+		routes := table[tc.alias]
+		if len(routes) == 0 || !reflect.DeepEqual(routes[0].modelInfo.Thinking, tc.want) {
+			t.Fatalf("alias %s routes = %+v, want thinking %+v", tc.alias, routes, tc.want)
+		}
+	}
+}
 
 func TestAttachResolvedAPIKeyModelInfoUsesSelectedCredential(t *testing.T) {
 	manager := NewManager(nil, nil, nil)

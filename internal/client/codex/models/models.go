@@ -461,7 +461,7 @@ func applyCodexClientModelCapabilities(entry map[string]any, id, metadataID stri
 			continue
 		}
 		isCodex := strings.EqualFold(strings.TrimSpace(p), "codex")
-		if (!isCodex && isAlias) || pInfo.ExplicitThinking {
+		if (!isCodex && isAlias) || pInfo.ExplicitThinking || pInfo.Type == "openai-compatibility" {
 			hasThinkingConstraint = true
 			pThinking := pInfo.Thinking
 			if pThinking == nil {
@@ -805,6 +805,8 @@ func hasImageModality(modalities []any) bool {
 
 func applyCodexClientThinkingMetadata(entry map[string]any, thinking *registry.ThinkingSupport, clientVersion string) {
 	if thinking == nil {
+		entry["supported_reasoning_levels"] = []any{}
+		delete(entry, "default_reasoning_level")
 		return
 	}
 

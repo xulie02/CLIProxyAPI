@@ -63,6 +63,7 @@ func requestLogCaptureEnabled(cfg *config.Config) bool {
 
 // RecordAPIRequest stores the upstream request metadata in Gin context for request logging.
 func RecordAPIRequest(ctx context.Context, cfg *config.Config, info UpstreamRequestLog) {
+	logUpstreamRequestSummary(ctx, info)
 	if cfg == nil || cfg.CommercialMode {
 		return
 	}
@@ -287,6 +288,7 @@ func AppendAPIResponseChunk(ctx context.Context, cfg *config.Config, chunk []byt
 
 // RecordAPIWebsocketRequest stores an upstream websocket request event in Gin context.
 func RecordAPIWebsocketRequest(ctx context.Context, cfg *config.Config, info UpstreamRequestLog) {
+	logUpstreamRequestSummary(ctx, info)
 	if !requestLogCaptureEnabled(cfg) {
 		return
 	}

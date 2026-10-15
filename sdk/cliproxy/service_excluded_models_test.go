@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -11,6 +12,33 @@ import (
 	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
 	"github.com/router-for-me/CLIProxyAPI/v8/sdk/config"
 )
+
+func TestOpenAICompatibilityThinkingUsesUpstreamCapabilities(t *testing.T) {
+	known := internalregistry.LookupStaticModelInfo("claude-opus-4-6")
+	if known == nil || known.Thinking == nil {
+		t.Fatal("known model missing thinking capabilities")
+	}
+	for _, tc := range []struct {
+		name  string
+		model config.OpenAICompatibilityModel
+		want  *internalregistry.ThinkingSupport
+	}{
+		{"known upstream behind alias", config.OpenAICompatibilityModel{Name: "claude-opus-4-6(high)", Alias: "private-chat"}, known.Thinking},
+		{"unknown upstream behind known alias", config.OpenAICompatibilityModel{Name: "unknown-upstream", Alias: "claude-opus-4-6"}, nil},
+		{"explicit override", config.OpenAICompatibilityModel{Name: "claude-opus-4-6", Thinking: &internalregistry.ThinkingSupport{Levels: []string{"ultra", "max"}}}, &internalregistry.ThinkingSupport{Levels: []string{"ultra", "max"}}},
+		{"explicit empty", config.OpenAICompatibilityModel{Name: "claude-opus-4-6", Thinking: &internalregistry.ThinkingSupport{}}, &internalregistry.ThinkingSupport{}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			models := buildOpenAICompatibilityConfigModels(&config.OpenAICompatibility{Name: "test", Models: []config.OpenAICompatibilityModel{tc.model}})
+			if len(models) != 1 || !reflect.DeepEqual(models[0].Thinking, tc.want) {
+				t.Fatalf("models = %+v, want thinking %+v", models, tc.want)
+			}
+			if models[0].ExplicitThinking != (tc.model.Thinking != nil) {
+				t.Fatal("explicit thinking marker does not match configuration")
+			}
+		})
+	}
+}
 
 func TestRegisterModelsForAuth_UsesPreMergedExcludedModelsAttribute(t *testing.T) {
 	service := &Service{
@@ -185,8 +213,8 @@ func TestRegisterModelsForAuth_OpenAICompatibilityImageModelType(t *testing.T) {
 	if chatModel.Type != "openai-compatibility" {
 		t.Fatalf("chat model type = %q, want openai-compatibility", chatModel.Type)
 	}
-	if chatModel.Thinking == nil {
-		t.Fatal("expected chat model to keep default thinking support")
+	if chatModel.Thinking != nil {
+		t.Fatalf("unknown chat model thinking = %+v, want unspecified", chatModel.Thinking)
 	}
 }
 

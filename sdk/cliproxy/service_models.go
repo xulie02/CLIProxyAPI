@@ -804,7 +804,7 @@ func buildOpenAICompatibilityConfigModels(compat *config.OpenAICompatibility) []
 		}
 		thinkingSupport := model.Thinking
 		if thinkingSupport == nil && !model.Image {
-			thinkingSupport = &registry.ThinkingSupport{Levels: []string{"low", "medium", "high"}}
+			thinkingSupport = modelconfig.ResolveModelInfo(info.MetadataModelID, modelType, nil).Thinking
 		}
 		if model.Thinking != nil {
 			info.ExplicitThinking = true

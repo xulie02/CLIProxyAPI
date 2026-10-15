@@ -9,6 +9,45 @@ import (
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
 )
 
+func TestUnknownModelDoesNotInheritTemplateReasoning(t *testing.T) {
+	response := BuildResponseForClient([]map[string]any{{"id": "unknown-thinking-capability-test"}}, nil, false, "")
+	models := response["models"].([]map[string]any)
+	if len(models) != 1 {
+		t.Fatalf("models = %#v, want one model", models)
+	}
+	levels, err := json.Marshal(models[0]["supported_reasoning_levels"])
+	if err != nil || string(levels) != "[]" {
+		t.Fatalf("reasoning levels = %s, error = %v, want []", levels, err)
+	}
+	if _, exists := models[0]["default_reasoning_level"]; exists {
+		t.Fatal("unknown model inherited a default reasoning level")
+	}
+}
+
+func TestUnknownCompatUpstreamDoesNotInheritKnownAliasReasoning(t *testing.T) {
+	const alias = "gpt-5.6-sol"
+	const client = "unknown-compat-upstream-thinking-test"
+	modelRegistry := registry.GetGlobalRegistry()
+	modelRegistry.RegisterClient(client, "openai-compatibility", []*registry.ModelInfo{{
+		ID: alias, MetadataModelID: "unknown-upstream", Type: "openai-compatibility",
+	}})
+	t.Cleanup(func() { modelRegistry.UnregisterClient(client) })
+	response := BuildResponseForClient([]map[string]any{{"id": alias}}, func(string) []string {
+		return []string{"openai-compatibility"}
+	}, false, "")
+	models := response["models"].([]map[string]any)
+	if len(models) != 1 {
+		t.Fatalf("models = %#v, want one model", models)
+	}
+	levels, err := json.Marshal(models[0]["supported_reasoning_levels"])
+	if err != nil || string(levels) != "[]" {
+		t.Fatalf("reasoning levels = %s, error = %v, want []", levels, err)
+	}
+	if _, exists := models[0]["default_reasoning_level"]; exists {
+		t.Fatal("unknown upstream inherited its public alias's default reasoning")
+	}
+}
+
 func TestCodexClientModelsResponse_InputModalitiesFromRegistry(t *testing.T) {
 	modelID := "mimo-v2.5-pro-codex-test"
 	textOnlyModelID := "mimo-text-only-codex-test"
