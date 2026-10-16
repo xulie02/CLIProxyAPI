@@ -8,12 +8,11 @@ import (
 )
 
 // ResolveModelInfo returns a private capability snapshot for a configured model.
-// Static capabilities come from the suffix-free upstream name, while explicit
-// configuration takes precedence.
-func ResolveModelInfo(name, modelType string, support *registry.ThinkingSupport) *registry.ModelInfo {
+// Capabilities come from the upstream name, then configured aliases for missing
+// fields. Explicit configuration takes precedence over either lookup.
+func ResolveModelInfo(name, modelType string, support *registry.ThinkingSupport, aliases ...string) *registry.ModelInfo {
 	trimmedName := strings.TrimSpace(name)
-	baseName := strings.TrimSpace(thinking.ParseSuffix(trimmedName).ModelName)
-	info := registry.LookupStaticModelInfo(baseName)
+	info := lookupModelCapabilities(trimmedName, aliases...)
 	if info == nil {
 		info = &registry.ModelInfo{}
 	}
@@ -24,6 +23,16 @@ func ResolveModelInfo(name, modelType string, support *registry.ThinkingSupport)
 	}
 	info.UserDefined = false
 	return info
+}
+
+func lookupModelCapabilities(name string, aliases ...string) *registry.ModelInfo {
+	names := make([]string, 0, len(aliases))
+	for _, alias := range aliases {
+		if normalized := strings.TrimSpace(thinking.ParseSuffix(alias).ModelName); normalized != "" {
+			names = append(names, normalized)
+		}
+	}
+	return registry.LookupModelCapabilityInfo(strings.TrimSpace(thinking.ParseSuffix(name).ModelName), names...)
 }
 
 // NormalizeThinkingSupport clones and normalizes configured reasoning levels.

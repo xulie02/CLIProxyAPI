@@ -806,7 +806,10 @@ func buildOpenAICompatibilityConfigModels(compat *config.OpenAICompatibility) []
 		}
 		thinkingSupport := model.Thinking
 		if !model.Image {
-			fallback := modelconfig.ResolveModelInfo(info.MetadataModelID, modelType, nil)
+			fallback := modelconfig.ResolveModelInfo(info.MetadataModelID, modelType, nil, model.Alias)
+			info.MaxCompletionTokens = fallback.MaxCompletionTokens
+			info.InputTokenLimit = fallback.InputTokenLimit
+			info.OutputTokenLimit = fallback.OutputTokenLimit
 			if thinkingSupport == nil {
 				thinkingSupport = fallback.Thinking
 			}
@@ -874,9 +877,14 @@ func buildConfigModels[T modelEntry](models []T, ownedBy, modelType, metadataCha
 		if model.GetThinking() != nil {
 			info.ExplicitThinking = true
 		}
-		if resolved := modelconfig.ResolveModelInfo(name, modelType, model.GetThinking()); resolved.Thinking != nil {
-			info.Thinking = resolved.Thinking
+		resolved := modelconfig.ResolveModelInfo(name, modelType, model.GetThinking(), model.GetAlias())
+		info.Thinking = resolved.Thinking
+		if info.MaxContextLength <= 0 {
+			info.ContextLength = resolved.ContextLength
 		}
+		info.MaxCompletionTokens = resolved.MaxCompletionTokens
+		info.InputTokenLimit = info.ContextLength
+		info.OutputTokenLimit = resolved.OutputTokenLimit
 		if staticInfo := registry.LookupStaticModelInfoByChannel(name, metadataChannel); staticInfo != nil && staticInfo.NativeCapabilities != nil {
 			info.NativeCapabilities = cloneModelInfoForCatalogRoute(staticInfo).NativeCapabilities
 		}

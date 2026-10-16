@@ -241,6 +241,14 @@ func configureCatalogs(ctx context.Context, sources CatalogSources, local, home 
 	generalCatalogUpdater.configure(ctx, sources.Catalog)
 	codexCatalogUpdater.configure(ctx, sources.CodexCatalog)
 	devinCatalogUpdater.configure(ctx, sources.DevinCatalog)
+	liteLLMSource := ""
+	if local {
+		liteLLMSource = embeddedCatalogSource
+	}
+	if home {
+		liteLLMSource = "disabled"
+	}
+	liteLLMCatalogUpdater.configure(ctx, liteLLMSource)
 }
 
 func effectiveCatalogSources(sources CatalogSources, local, home bool) CatalogSources {

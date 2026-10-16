@@ -372,6 +372,9 @@ func (s *Service) registerModelRefreshCallback() {
 		}
 
 		auths := s.coreManager.List()
+		if providerSet["litellm"] {
+			s.coreManager.RefreshAPIKeyModelAlias()
+		}
 		refreshed := 0
 		var refreshedMu sync.Mutex
 		tasks := make([]modelRegistrationTask, 0, len(auths))
@@ -384,7 +387,7 @@ func (s *Service) registerModelRefreshCallback() {
 				continue
 			}
 			provider := strings.ToLower(strings.TrimSpace(auth.Provider))
-			if !providerSet[provider] {
+			if !providerSet[provider] && !(providerSet["litellm"] && auth.AuthKind() == coreauth.AuthKindAPIKey) {
 				continue
 			}
 			authForRefresh := auth

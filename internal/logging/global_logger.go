@@ -52,7 +52,7 @@ type LogFormatter struct{}
 
 // logFieldOrder defines the display order for common log fields.
 var logFieldOrder = []string{
-	"provider", "model", "requested_model", "requested_reasoning_effort", "upstream_reasoning_effort",
+	"provider", "model", "upstream_reasoning_effort", "upstream_thinking", "requested_model", "requested_reasoning_effort",
 	"plugin_id", "plugin_name", "source_id",
 	"version", "active_version", "retired_version", "overwritten",
 	"mode", "budget", "level", "original_mode", "original_value", "min", "max", "clamped_to", "error",
@@ -65,6 +65,7 @@ var quotedLogFields = map[string]struct{}{
 	"requested_model":            {},
 	"requested_reasoning_effort": {},
 	"upstream_reasoning_effort":  {},
+	"upstream_thinking":          {},
 	"credential":                 {},
 	"auth_id":                    {},
 	"auth_index":                 {},

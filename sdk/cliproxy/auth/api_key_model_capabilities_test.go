@@ -48,6 +48,28 @@ func TestConfiguredCompatExecutionUsesDiscoveredCapability(t *testing.T) {
 	}
 }
 
+func TestConfiguredAliasCapabilityFallbackKeepsActualRouteName(t *testing.T) {
+	manager := NewManager(nil, nil, nil)
+	manager.SetConfig(&internalconfig.Config{OpenAICompatibility: []internalconfig.OpenAICompatibility{{
+		Name: "alias-capability-channel", BaseURL: "https://supplier.example/v1", APIKeyEntries: []internalconfig.OpenAICompatibilityAPIKey{{APIKey: "test-key"}},
+		Models: []internalconfig.OpenAICompatibilityModel{{Name: "auto", Alias: "claude-opus-4-6"}},
+	}}})
+	auth := &Auth{ID: "alias-capability-auth", Provider: "alias-capability-channel", Attributes: map[string]string{
+		AttributeAuthKind: AuthKindAPIKey, AttributeAPIKey: "test-key", "compat_name": "alias-capability-channel", "provider_key": "alias-capability-channel", "base_url": "https://supplier.example/v1",
+	}}
+	registerCapabilityTestAuth(t, manager, auth)
+	req := manager.attachResolvedAPIKeyModelInfo(cliproxyexecutor.Request{}, auth, "claude-opus-4-6", "auto")
+	info, ok := ResolvedAPIKeyModelInfo(req)
+	known := registry.LookupModelCapabilityInfo("claude-opus-4-6")
+	if !ok || info.ID != "auto" || info.ContextLength != known.ContextLength || !reflect.DeepEqual(info.Thinking, modelconfig.NormalizeThinkingSupport(known.Thinking)) {
+		t.Fatalf("alias fallback failed: %+v", info)
+	}
+	actual, _, _, _ := manager.executionModelCandidatesWithAlias(auth, "claude-opus-4-6")
+	if !reflect.DeepEqual(actual, []string{"auto"}) {
+		t.Fatalf("alias changed upstream route: %v", actual)
+	}
+}
+
 func TestCompileOpenAICompatibleThinkingUsesUpstreamCapabilities(t *testing.T) {
 	known := registry.LookupStaticModelInfo("claude-opus-4-6")
 	if known == nil || known.Thinking == nil {
@@ -64,7 +86,7 @@ func TestCompileOpenAICompatibleThinkingUsesUpstreamCapabilities(t *testing.T) {
 		want  *registry.ThinkingSupport
 	}{
 		{"known-alias", known.Thinking},
-		{"claude-opus-4-6", nil},
+		{"claude-opus-4-6", known.Thinking},
 		{"explicit-alias", &registry.ThinkingSupport{Levels: []string{"ultra", "max"}}},
 		{"empty-alias", &registry.ThinkingSupport{}},
 	} {

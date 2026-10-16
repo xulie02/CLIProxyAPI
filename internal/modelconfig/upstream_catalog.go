@@ -27,6 +27,7 @@ type UpstreamSource struct {
 type UpstreamModelCapability struct {
 	Thinking      *registry.ThinkingSupport
 	ContextWindow int
+	OutputTokens  int
 }
 
 type upstreamCatalogEntry struct {
@@ -135,6 +136,7 @@ func fetchUpstreamCapabilities(ctx context.Context, client *http.Client, source 
 		Data []struct {
 			ID            string `json:"id"`
 			ContextWindow int    `json:"context_window"`
+			OutputTokens  int    `json:"max_output_tokens"`
 			Effort        *struct {
 				SupportedLevels []string `json:"supported_levels"`
 				DefaultLevel    string   `json:"default_level"`
@@ -153,6 +155,9 @@ func fetchUpstreamCapabilities(ctx context.Context, client *http.Client, source 
 		if model.ContextWindow > 0 {
 			value.ContextWindow = model.ContextWindow
 		}
+		if model.OutputTokens > 0 {
+			value.OutputTokens = model.OutputTokens
+		}
 		if model.Effort != nil && model.Effort.SupportedLevels != nil {
 			value.Thinking = NormalizeThinkingSupport(&registry.ThinkingSupport{
 				Levels: model.Effort.SupportedLevels, DefaultLevel: model.Effort.DefaultLevel,
@@ -164,11 +169,12 @@ func fetchUpstreamCapabilities(ctx context.Context, client *http.Client, source 
 }
 
 // ApplyUpstreamCapabilities resolves explicit configuration, upstream metadata,
-// and then the internal catalog, always using the actual upstream model ID.
-func ApplyUpstreamCapabilities(info *registry.ModelInfo, source UpstreamSource, upstream string) {
+// and then the internal catalog. Configured aliases only fill missing internal
+// capability fields; discovery and outbound requests use the upstream ID.
+func ApplyUpstreamCapabilities(info *registry.ModelInfo, source UpstreamSource, upstream string, aliases ...string) {
 	baseName := thinking.ParseSuffix(upstream).ModelName
 	capability := DefaultUpstreamCatalog.Lookup(source, baseName)
-	fallback := registry.LookupStaticModelInfo(baseName)
+	fallback := lookupModelCapabilities(baseName, aliases...)
 	if !info.ExplicitThinking {
 		info.Thinking = capability.Thinking
 		if info.Thinking == nil && fallback != nil {
@@ -181,4 +187,10 @@ func ApplyUpstreamCapabilities(info *registry.ModelInfo, source UpstreamSource, 
 			info.ContextLength = fallback.ContextLength
 		}
 	}
+	info.MaxCompletionTokens = capability.OutputTokens
+	if info.MaxCompletionTokens <= 0 && fallback != nil {
+		info.MaxCompletionTokens = fallback.MaxCompletionTokens
+	}
+	info.OutputTokenLimit = info.MaxCompletionTokens
+	info.InputTokenLimit = info.ContextLength
 }

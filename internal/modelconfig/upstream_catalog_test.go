@@ -142,6 +142,61 @@ func TestExplicitThinkingAndContextOverrideUpstream(t *testing.T) {
 	}
 }
 
+func TestOfficialMetadataOverridesLiteLLMCatalog(t *testing.T) {
+	original := DefaultUpstreamCatalog
+	DefaultUpstreamCatalog = NewUpstreamCatalog()
+	defer func() { DefaultUpstreamCatalog = original }()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, `{"data":[{"id":"deepseek-flash","context_window":1048576,"max_output_tokens":393216,"effort":{"supported_levels":["low","high","max"],"default_level":"high"}}]}`)
+	}))
+	defer server.Close()
+	source := UpstreamSource{BaseURL: server.URL}
+	if _, err := DefaultUpstreamCatalog.Refresh(t.Context(), server.Client(), source); err != nil {
+		t.Fatal(err)
+	}
+	info := &registry.ModelInfo{}
+	ApplyUpstreamCapabilities(info, source, "deepseek-flash")
+	if info.ContextLength != 1048576 || info.MaxCompletionTokens != 393216 || info.Thinking == nil || info.Thinking.DefaultLevel != "high" {
+		t.Fatalf("official metadata lost priority: %+v", info)
+	}
+}
+
+func TestAliasFallbackPreservesOfficialAndManualPriorities(t *testing.T) {
+	original := DefaultUpstreamCatalog
+	DefaultUpstreamCatalog = NewUpstreamCatalog()
+	defer func() { DefaultUpstreamCatalog = original }()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, `{"data":[{"id":"opaque-real-name","context_window":65536,"effort":{"supported_levels":["high"]}}]}`)
+	}))
+	defer server.Close()
+	source := UpstreamSource{BaseURL: server.URL}
+	if _, err := DefaultUpstreamCatalog.Refresh(t.Context(), server.Client(), source); err != nil {
+		t.Fatal(err)
+	}
+	alias := "claude-opus-4-6"
+	known := registry.LookupModelCapabilityInfo(alias)
+	if known == nil || known.Thinking == nil {
+		t.Fatal("test alias is absent from the internal table")
+	}
+	info := ResolveModelInfo("auto", "openai-compatibility", nil, alias)
+	ApplyUpstreamCapabilities(info, source, "auto", alias)
+	if info.ID != "auto" || info.ContextLength != known.ContextLength || !reflect.DeepEqual(info.Thinking, NormalizeThinkingSupport(known.Thinking)) {
+		t.Fatalf("alias fallback failed: %+v", info)
+	}
+	ApplyUpstreamCapabilities(info, source, "opaque-real-name", alias)
+	if info.ContextLength != 65536 || !reflect.DeepEqual(info.Thinking.Levels, []string{"high"}) {
+		t.Fatal("alias overrode official upstream metadata")
+	}
+	manual := ResolveModelInfo("auto", "openai-compatibility", &registry.ThinkingSupport{}, alias)
+	manual.ExplicitThinking = true
+	manual.ContextLength = 32000
+	manual.MaxContextLength = 32000
+	ApplyUpstreamCapabilities(manual, source, "opaque-real-name", alias)
+	if manual.ContextLength != 32000 || manual.Thinking == nil || len(manual.Thinking.Levels) != 0 {
+		t.Fatal("alias or upstream metadata overrode explicit configuration")
+	}
+}
+
 func TestUpstreamCapabilitiesFallBackPerFieldToInternalModel(t *testing.T) {
 	original := DefaultUpstreamCatalog
 	DefaultUpstreamCatalog = NewUpstreamCatalog()

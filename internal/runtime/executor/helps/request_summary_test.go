@@ -17,12 +17,15 @@ func TestUpstreamRequestSummaryUsesFinalPayloadWithoutBodyLogging(t *testing.T) 
 	ctx := usage.WithRequestedModelAlias(context.Background(), "public-alias")
 	ctx = usage.WithReasoningEffort(ctx, "high")
 	tests := []struct {
-		name, provider, body, url, model, effort string
-		websocket                                bool
+		name, provider, body, url, model, effort, thinkingMode string
+		websocket                                              bool
 	}{
 		{name: "HTTP configured override", provider: "custom-channel", body: `{"model":"upstream-model","reasoning_effort":"low","messages":[{"content":"private prompt"}]}`, model: "upstream-model", effort: "low"},
 		{name: "Responses", provider: "custom-channel", body: `{"model":"upstream-model","reasoning":{"effort":"xhigh"}}`, model: "upstream-model", effort: "xhigh"},
 		{name: "removed parameter", provider: "openai", body: `{"model":"upstream-model"}`, model: "upstream-model", effort: "unspecified"},
+		{name: "DeepSeek thinking disabled without effort", provider: "custom-channel", body: `{"model":"deepseek-flash","thinking":{"type":"disabled"}}`, model: "deepseek-flash", effort: "unspecified", thinkingMode: "disabled"},
+		{name: "DeepSeek thinking enabled without effort", provider: "custom-channel", body: `{"model":"deepseek-flash","thinking":{"type":"enabled"}}`, model: "deepseek-flash", effort: "unspecified", thinkingMode: "enabled"},
+		{name: "DeepSeek enabled with selected effort", provider: "custom-channel", body: `{"model":"deepseek-flash","thinking":{"type":"enabled"},"reasoning_effort":"max"}`, model: "deepseek-flash", effort: "max", thinkingMode: "enabled"},
 		{name: "explicitly disabled", provider: "openai", body: `{"model":"upstream-model","reasoning_effort":"none"}`, model: "upstream-model", effort: "none"},
 		{name: "websocket", provider: "codex", body: `{"type":"response.create","model":"upstream-model","reasoning":{"effort":"medium"}}`, model: "upstream-model", effort: "medium", websocket: true},
 		{name: "Gemini URL model", provider: "gemini", url: "https://example.com/v1beta/models/gemini-model:generateContent?key=secret-key", body: `{"generationConfig":{"thinkingConfig":{"thinkingLevel":"high"}}}`, model: "gemini-model", effort: "high"},
@@ -41,9 +44,14 @@ func TestUpstreamRequestSummaryUsesFinalPayloadWithoutBodyLogging(t *testing.T) 
 				t.Fatalf("log entries = %d, want 1", len(entries))
 			}
 			entry := entries[0]
+			wantThinkingMode := tc.thinkingMode
+			if wantThinkingMode == "" {
+				wantThinkingMode = "unspecified"
+			}
 			for key, want := range map[string]string{
 				"model": tc.model, "requested_model": "public-alias",
 				"requested_reasoning_effort": "high", "upstream_reasoning_effort": tc.effort,
+				"upstream_thinking": wantThinkingMode,
 			} {
 				if entry.Data[key] != want {
 					t.Errorf("%s = %v, want %s", key, entry.Data[key], want)
@@ -54,7 +62,7 @@ func TestUpstreamRequestSummaryUsesFinalPayloadWithoutBodyLogging(t *testing.T) 
 				t.Fatal(err)
 			}
 			line := string(formatted)
-			for _, want := range []string{`requested_model="public-alias"`, `requested_reasoning_effort="high"`, `upstream_reasoning_effort="` + tc.effort + `"`} {
+			for _, want := range []string{`requested_model="public-alias"`, `requested_reasoning_effort="high"`, `upstream_reasoning_effort="` + tc.effort + `"`, `upstream_thinking="` + wantThinkingMode + `"`} {
 				if !strings.Contains(line, want) {
 					t.Errorf("formatted log missing %s: %s", want, line)
 				}

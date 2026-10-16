@@ -27,7 +27,7 @@ func discoveredCompatibilityModels(models []*ModelInfo, compat *config.OpenAICom
 		}
 		clone := *model
 		if clone.Type != registry.OpenAIImageModelType {
-			modelconfig.ApplyUpstreamCapabilities(&clone, source, clone.MetadataModelID)
+			modelconfig.ApplyUpstreamCapabilities(&clone, source, clone.MetadataModelID, model.ID)
 		}
 		out = append(out, &clone)
 	}

@@ -43,6 +43,15 @@ func logUpstreamRequestSummary(ctx context.Context, info UpstreamRequestLog) {
 	if effort == "" {
 		effort = "unspecified"
 	}
+	// A native thinking toggle and an effort level are separate request fields.
+	// Missing fields leave the provider's defaults in control.
+	thinkingMode := strings.TrimSpace(gjson.GetBytes(info.Body, "thinking.type").String())
+	if thinkingMode == "" {
+		thinkingMode = strings.TrimSpace(gjson.GetBytes(info.Body, "request.thinking.type").String())
+	}
+	if thinkingMode == "" {
+		thinkingMode = "unspecified"
+	}
 	requestedEffort := usage.ReasoningEffortFromContext(ctx)
 	if requestedEffort == "" {
 		requestedEffort = "unspecified"
@@ -57,5 +66,6 @@ func logUpstreamRequestSummary(ctx context.Context, info UpstreamRequestLog) {
 		"requested_model":            requestedModel,
 		"requested_reasoning_effort": requestedEffort,
 		"upstream_reasoning_effort":  effort,
+		"upstream_thinking":          thinkingMode,
 	}).Info("upstream request")
 }

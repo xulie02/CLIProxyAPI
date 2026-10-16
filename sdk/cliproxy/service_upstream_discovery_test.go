@@ -32,6 +32,7 @@ func TestUpstreamDiscoveryPublishesCapabilitiesThroughAliases(t *testing.T) {
 		Models: []config.OpenAICompatibilityModel{
 			{Name: "upstream-model", Alias: "discovered-public"},
 			{Name: "auto", Alias: "gpt-5.6-sol"},
+			{Name: "opaque-real-name", Alias: "claude-opus-4-6"},
 			{Name: "upstream-model", Alias: "manual-public", Thinking: &registry.ThinkingSupport{Levels: []string{"max"}}, MaxContextLength: 32000},
 		},
 	}}}
@@ -47,10 +48,10 @@ func TestUpstreamDiscoveryPublishesCapabilitiesThroughAliases(t *testing.T) {
 	service := &Service{cfg: cfg, coreManager: manager}
 	service.refreshUpstreamDiscovery(context.Background())
 	registered := GlobalModelRegistry().GetModelsForClient(auth.ID)
-	if len(registered) != 3 {
-		t.Fatalf("registered models = %d, want 3", len(registered))
+	if len(registered) != 4 {
+		t.Fatalf("registered models = %d, want 4", len(registered))
 	}
-	input := []map[string]any{{"id": "discovered-public"}, {"id": "manual-public"}, {"id": "gpt-5.6-sol"}}
+	input := []map[string]any{{"id": "discovered-public"}, {"id": "manual-public"}, {"id": "gpt-5.6-sol"}, {"id": "claude-opus-4-6"}}
 	response := codexmodels.BuildResponseForClient(input, func(string) []string { return []string{"catalog-test"} }, false, "")
 	for _, entry := range response["models"].([]map[string]any) {
 		slug := entry["slug"].(string)
@@ -59,6 +60,11 @@ func TestUpstreamDiscoveryPublishesCapabilitiesThroughAliases(t *testing.T) {
 			levels = append(levels, raw.(map[string]any)["effort"].(string))
 		}
 		switch slug {
+		case "claude-opus-4-6", "gpt-5.6-sol":
+			known := registry.LookupModelCapabilityInfo(slug)
+			if !reflect.DeepEqual(levels, known.Thinking.Levels) || entry["context_window"] != known.ContextLength {
+				t.Fatal("configured alias capabilities did not reach the client catalog")
+			}
 		case "discovered-public":
 			if !reflect.DeepEqual(levels, []string{"low", "high", "max"}) || entry["default_reasoning_level"] != "high" || entry["context_window"] != 1048576 {
 				t.Fatalf("discovered catalog metadata = %+v", entry)
@@ -66,13 +72,6 @@ func TestUpstreamDiscoveryPublishesCapabilitiesThroughAliases(t *testing.T) {
 		case "manual-public":
 			if !reflect.DeepEqual(levels, []string{"max"}) || entry["context_window"] != 32000 {
 				t.Fatalf("manual override lost priority: %+v", entry)
-			}
-		case "gpt-5.6-sol":
-			if len(levels) != 0 {
-				t.Fatalf("auto inherited alias levels %v", levels)
-			}
-			if _, ok := entry["context_window"]; ok {
-				t.Fatal("auto inherited template context window")
 			}
 		default:
 			t.Fatalf("unexpected model %s", slug)

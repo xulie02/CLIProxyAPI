@@ -248,7 +248,7 @@ func lookupUnlistedCodexAPIKeyModelCapability(routing *apiKeyModelRoutingSnapsho
 	}
 	for _, configured := range entry.Models {
 		if strings.EqualFold(strings.TrimSpace(configured.Name), strings.TrimSpace(upstreamModel)) || configuredUpstreamFallbackMatches(configured.Name, upstreamModel) {
-			info := modelconfig.ResolveModelInfo(upstreamModel, "codex", configured.Thinking)
+			info := modelconfig.ResolveModelInfo(upstreamModel, "codex", configured.Thinking, configured.Alias)
 			info.SupportConfigurationUpdate = configured.SupportConfigurationUpdate
 			info.IsCompat = configured.IsCompat
 			return info, true
@@ -442,7 +442,7 @@ func compileOpenAICompatibleModelCapabilities(out map[string][]apiKeyModelCapabi
 		if info != nil && !models[i].Image && len(sources) > 0 {
 			info.ExplicitThinking = models[i].Thinking != nil
 			info.MaxContextLength = models[i].MaxContextLength
-			modelconfig.ApplyUpstreamCapabilities(info, sources[0], info.ID)
+			modelconfig.ApplyUpstreamCapabilities(info, sources[0], info.ID, models[i].Alias)
 		}
 	}
 }
@@ -459,7 +459,7 @@ func addConfiguredModelCapability(out map[string][]apiKeyModelCapabilityRoute, n
 	if name == "" {
 		return nil
 	}
-	modelInfo := modelconfig.ResolveModelInfo(name, modelType, support)
+	modelInfo := modelconfig.ResolveModelInfo(name, modelType, support, alias)
 	modelInfo.IsCompat = isCompat
 	route := apiKeyModelCapabilityRoute{upstreamModel: name, modelInfo: modelInfo}
 	seenKeys := make(map[string]struct{})

@@ -8,6 +8,7 @@ import (
 
 func TestCatalogPolicyHotReload(t *testing.T) {
 	oldGeneral, oldCodex, oldDevin := generalCatalogUpdater, codexCatalogUpdater, devinCatalogUpdater
+	oldLiteLLM := liteLLMCatalogUpdater
 	catalogRuntime.Lock()
 	oldCtx, oldLocal := catalogRuntime.ctx, catalogRuntime.local
 	catalogRuntime.Unlock()
@@ -15,6 +16,7 @@ func TestCatalogPolicyHotReload(t *testing.T) {
 	defer func() {
 		cancel()
 		generalCatalogUpdater, codexCatalogUpdater, devinCatalogUpdater = oldGeneral, oldCodex, oldDevin
+		liteLLMCatalogUpdater = oldLiteLLM
 		catalogRuntime.Lock()
 		catalogRuntime.ctx, catalogRuntime.local = oldCtx, oldLocal
 		catalogRuntime.Unlock()
@@ -30,6 +32,8 @@ func TestCatalogPolicyHotReload(t *testing.T) {
 	generalCatalogUpdater, general = newUpdater()
 	codexCatalogUpdater, codex = newUpdater()
 	devinCatalogUpdater, devin = newUpdater()
+	var liteLLM <-chan string
+	liteLLMCatalogUpdater, liteLLM = newUpdater()
 	awaitSource := func(ch <-chan string, want string) {
 		t.Helper()
 		select {
@@ -46,6 +50,7 @@ func TestCatalogPolicyHotReload(t *testing.T) {
 	awaitSource(general, "https://example.com/general")
 	awaitSource(codex, embeddedCatalogSource)
 	awaitSource(devin, embeddedCatalogSource)
+	awaitSource(liteLLM, embeddedCatalogSource)
 	UpdateModelCatalogSources(CatalogSources{CodexCatalog: "https://example.com/codex"}, false)
 	awaitSource(general, embeddedCatalogSource)
 	awaitSource(codex, "https://example.com/codex")

@@ -24,6 +24,8 @@ RUN mkdir /CLIProxyAPI
 
 COPY --from=builder ./app/CLIProxyAPI /CLIProxyAPI/CLIProxyAPI
 
+COPY --from=builder /app/internal/registry/models/LITELLM_LICENSE /CLIProxyAPI/licenses/LITELLM_LICENSE
+
 COPY config.example.yaml /CLIProxyAPI/config.example.yaml
 
 WORKDIR /CLIProxyAPI
