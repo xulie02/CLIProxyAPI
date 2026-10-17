@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/router-for-me/CLIProxyAPI/v8/internal/logging"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/thinking"
 	"github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/usage"
 	log "github.com/sirupsen/logrus"
@@ -60,12 +61,21 @@ func logUpstreamRequestSummary(ctx context.Context, info UpstreamRequestLog) {
 	if requestedModel == "" {
 		requestedModel = "unknown"
 	}
+	metadata := logging.GetClientRequestMetadata(ctx)
+	clientIP := strings.TrimSpace(metadata.ResolvedClientIP)
+	if clientIP == "" {
+		clientIP = strings.TrimSpace(metadata.ClientIP)
+	}
+	if clientIP == "" {
+		clientIP = "unknown"
+	}
 	LogWithRequestID(ctx).WithFields(log.Fields{
+		"client_ip":                  clientIP,
 		"provider":                   info.Provider,
 		"model":                      model,
 		"requested_model":            requestedModel,
 		"requested_reasoning_effort": requestedEffort,
 		"upstream_reasoning_effort":  effort,
 		"upstream_thinking":          thinkingMode,
-	}).Info("upstream request")
+	}).Info("模型请求")
 }

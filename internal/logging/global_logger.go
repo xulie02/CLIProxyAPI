@@ -52,6 +52,7 @@ type LogFormatter struct{}
 
 // logFieldOrder defines the display order for common log fields.
 var logFieldOrder = []string{
+	"client_ip",
 	"provider", "model", "upstream_reasoning_effort", "upstream_thinking", "requested_model", "requested_reasoning_effort",
 	"plugin_id", "plugin_name", "source_id",
 	"version", "active_version", "retired_version", "overwritten",
@@ -121,7 +122,11 @@ func (m *LogFormatter) Format(entry *log.Entry) ([]byte, error) {
 		var fields []string
 		for _, k := range logFieldOrder {
 			if v, ok := entry.Data[k]; ok {
-				fields = append(fields, fmt.Sprintf("%s=%s", k, formatLogFieldValue(k, v)))
+				name, value := k, formatLogFieldValue(k, v)
+				if message == "模型请求" {
+					name, value = formatModelRequestLogField(k, v)
+				}
+				fields = append(fields, fmt.Sprintf("%s=%s", name, value))
 			}
 		}
 		if pluginID, ok := entry.Data["plugin_id"]; ok && strings.TrimSpace(fmt.Sprint(pluginID)) != "" {

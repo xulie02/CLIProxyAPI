@@ -16,6 +16,9 @@ func TestUpstreamRequestSummaryUsesFinalPayloadWithoutBodyLogging(t *testing.T) 
 	log.SetLevel(log.InfoLevel)
 	ctx := usage.WithRequestedModelAlias(context.Background(), "public-alias")
 	ctx = usage.WithReasoningEffort(ctx, "high")
+	ctx = logging.WithClientRequestMetadata(ctx, logging.ClientRequestMetadata{
+		ClientIP: "172.18.0.6", ResolvedClientIP: "203.0.113.5",
+	})
 	tests := []struct {
 		name, provider, body, url, model, effort, thinkingMode string
 		websocket                                              bool
@@ -44,12 +47,16 @@ func TestUpstreamRequestSummaryUsesFinalPayloadWithoutBodyLogging(t *testing.T) 
 				t.Fatalf("log entries = %d, want 1", len(entries))
 			}
 			entry := entries[0]
+			if entry.Message != "模型请求" {
+				t.Errorf("message = %q, want localized model request message", entry.Message)
+			}
 			wantThinkingMode := tc.thinkingMode
 			if wantThinkingMode == "" {
 				wantThinkingMode = "unspecified"
 			}
 			for key, want := range map[string]string{
-				"model": tc.model, "requested_model": "public-alias",
+				"client_ip": "203.0.113.5",
+				"model":     tc.model, "requested_model": "public-alias",
 				"requested_reasoning_effort": "high", "upstream_reasoning_effort": tc.effort,
 				"upstream_thinking": wantThinkingMode,
 			} {
@@ -62,13 +69,42 @@ func TestUpstreamRequestSummaryUsesFinalPayloadWithoutBodyLogging(t *testing.T) 
 				t.Fatal(err)
 			}
 			line := string(formatted)
-			for _, want := range []string{`requested_model="public-alias"`, `requested_reasoning_effort="high"`, `upstream_reasoning_effort="` + tc.effort + `"`, `upstream_thinking="` + wantThinkingMode + `"`} {
+			for _, want := range []string{"模型请求", `来源IP="203.0.113.5"`, `请求模型="public-alias"`, `请求思考等级="高(high)"`, `上游模型="` + tc.model + `"`, "上游思考等级=", "上游思考状态="} {
 				if !strings.Contains(line, want) {
 					t.Errorf("formatted log missing %s: %s", want, line)
 				}
 			}
 			if strings.Contains(line, "private prompt") || strings.Contains(line, "secret-key") {
 				t.Fatalf("summary leaked request content or credentials: %s", line)
+			}
+		})
+	}
+}
+
+func TestUpstreamRequestSummaryClientIP(t *testing.T) {
+	hook := setupResponseModelLoggerHook(t)
+	log.SetLevel(log.InfoLevel)
+	tests := []struct {
+		name     string
+		metadata logging.ClientRequestMetadata
+		want     string
+	}{
+		{name: "resolved address", metadata: logging.ClientRequestMetadata{ClientIP: "172.18.0.6", ResolvedClientIP: "203.0.113.5"}, want: "203.0.113.5"},
+		{name: "IPv6 peer fallback", metadata: logging.ClientRequestMetadata{ClientIP: "2001:db8::1"}, want: "2001:db8::1"},
+		{name: "untrusted forwarded header is ignored", metadata: logging.ClientRequestMetadata{ClientIP: "192.0.2.10", XForwardedFor: "203.0.113.99"}, want: "192.0.2.10"},
+		{name: "missing address", want: "unknown"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			hook.Reset()
+			ctx := logging.WithClientRequestMetadata(context.Background(), tc.metadata)
+			RecordAPIRequest(ctx, &config.Config{}, UpstreamRequestLog{Body: []byte(`{"model":"auto"}`)})
+			entries := hook.AllEntries()
+			if len(entries) != 1 {
+				t.Fatalf("log entries = %d, want 1", len(entries))
+			}
+			if got := entries[0].Data["client_ip"]; got != tc.want {
+				t.Errorf("client_ip = %v, want %q", got, tc.want)
 			}
 		})
 	}
